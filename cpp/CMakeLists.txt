@@ -5,7 +5,11 @@ project(zksnark-java-sdk)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(CMAKE_BUILD_TYPE Release)
+IF (WIN32)
+SET(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG")
+ELSE()
 SET(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall -DNDEBUG")
+ENDIF()
 find_package( Threads )
 find_package(Java REQUIRED)
 # find_package(JNI REQUIRED)
@@ -19,6 +23,7 @@ include_directories(include)
 include_directories($ENV{JAVA_HOME}/include)
 include_directories($ENV{JAVA_HOME}/include/linux)
 include_directories($ENV{JAVA_HOME}/include/darwin)
+include_directories($ENV{JAVA_HOME}/include/win32)
 
 link_directories(lib)
 
@@ -54,25 +59,52 @@ add_custom_command(
 		DEPENDS ${sodium_jni_include}
 )
 
-set_directory_properties(PROPERTIES EP_PREFIX ${CMAKE_BINARY_DIR}/rust)
+#set_directory_properties(PROPERTIES EP_PREFIX ${CMAKE_BINARY_DIR}/rust)
 set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES
 		${CMAKE_CURRENT_SOURCE_DIR}/../rust/librustzcash/target
 		)
 
+IF ($<CONFIG:Release> OR $<CONFIG:MinSizeRel>)
 ExternalProject_Add(
 		librustzcash
 		DOWNLOAD_COMMAND ""
 		CONFIGURE_COMMAND ""
-		BUILD_COMMAND cargo build
-		#		COMMAND cargo build
-		--package librustzcash
-		--release
+		BUILD_COMMAND cargo build --package librustzcash --release
 		BINARY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../rust/librustzcash"
 		INSTALL_COMMAND ""
 		LOG_BUILD OFF)
+ELSE()
+ExternalProject_Add(
+		librustzcash
+		DOWNLOAD_COMMAND ""
+		CONFIGURE_COMMAND ""
+		BUILD_COMMAND cargo build --package librustzcash
+		BINARY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../rust/librustzcash"
+		INSTALL_COMMAND ""
+		LOG_BUILD OFF)
+ENDIF()
 
 add_custom_target(rust ALL DEPENDS librustzcash)
 
+IF (WIN32)
+
+set(RUSTZCASH_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/../rust/librustzcash/target/debug/rustzcash.lib" ntdll.lib Ws2_32.lib Userenv.lib)
+
+set (nacl_ver 1.0.17)
+ExternalProject_Add(libsodium
+		URL https://github.com/ndv/libsodium/archive/refs/tags/1.0.21-snapshot.tar.gz
+		BUILD_IN_SOURCE 1
+		CONFIGURE_COMMAND ""
+		BUILD_COMMAND cd builds\\msvc\\vs2022\\libsodium && ${MSBUILD} -target:Build /p:Configuration=$<$<CONFIG:Release>:ReleaseLIB>$<$<CONFIG:Debug>:DebugLIB> /p:Platform=x64 
+		INSTALL_COMMAND ""
+		)
+ExternalProject_Get_Property(libsodium SOURCE_DIR)
+include_directories(${SOURCE_DIR}/src/libsodium/include)
+set(NACL_LIBRARIES ${SOURCE_DIR}/bin/x64/Release/v143/static/libsodium.lib)
+
+ELSE()
+
+set(RUSTZCASH_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/../rust/librustzcash/target/release/librustzcash.a")
 
 # libsodium
 set (nacl_ver 1.0.15)
@@ -86,8 +118,10 @@ ExternalProject_Add(libsodium
 ExternalProject_Get_Property(libsodium INSTALL_DIR)
 set(NACL_DIR ${INSTALL_DIR})
 include_directories(${NACL_DIR}/src/libsodium/src/libsodium/include)
+set(NACL_LIBRARIES ${NACL_DIR}/src/libsodium/src/libsodium/.libs/libsodium.a)
 #add_library(nacl_lib STATIC IMPORTED)
 #set_property(TARGET nacl_lib PROPERTY IMPORTED_LOCATION ${NACL_DIR}/src/libsodium/src/libsodium/.libs/libsodium.a)
+ENDIF()
 
 ADD_LIBRARY(zksnarkjni
 		SHARED
@@ -101,8 +135,8 @@ ADD_LIBRARY(zksnarkjni
 
 target_link_libraries(zksnarkjni
 		${CMAKE_THREAD_LIBS_INIT}
-		"${CMAKE_CURRENT_SOURCE_DIR}/../rust/librustzcash/target/release/librustzcash.a"
-		${NACL_DIR}/src/libsodium/src/libsodium/.libs/libsodium.a
+		${RUSTZCASH_LIBRARIES}
+		${NACL_LIBRARIES}
 	)
 
 add_dependencies(zksnarkjni rust)

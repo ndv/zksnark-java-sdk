@@ -2,6 +2,10 @@
 // Created by ruipeng on 6/5/19.
 //
 
+#ifdef _WIN32
+#define SODIUM_STATIC
+#endif
+
 #include "org_tron_common_zksnark_Libsodium_LibsodiumJNI.h"
 #include "sodium.h"
 #include <iostream>

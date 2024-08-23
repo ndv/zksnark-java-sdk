@@ -25,20 +25,42 @@ jboolean bool2jboolean(bool b) {
  */
 JNIEXPORT void JNICALL Java_org_tron_common_zksnark_Librustzcash_00024LibrustzcashJNI_librustzcashInitZksnarkParams
     (JNIEnv * env, jobject, jstring spend_path, jstring spend_hash, jstring output_path, jstring output_hash) {
+
+#ifdef _WIN32
+	const jchar* sp = env->GetStringChars(spend_path, nullptr);
+    const char* sh = (const char*)env->GetStringUTFChars(spend_hash, nullptr);
+	const jchar* op = env->GetStringChars(output_path, nullptr);
+    const char* oh = (const char*)env->GetStringUTFChars(output_hash, nullptr);
+    if (sp == NULL || sh == NULL || op == NULL || oh == NULL)
+    {
+		env->ThrowNew(env->FindClass("java/lang/NullPointerException"), "NULL string passed to librustzcashInitZksnarkParams");
+        return;
+    }
+    librustzcash_init_zksnark_params(sp, (size_t)env->GetStringLength(spend_path), sh, op,
+        (size_t)env->GetStringLength(output_path), oh);
+	env->ReleaseStringChars(spend_path, sp);
+	env->ReleaseStringUTFChars(spend_hash, sh);
+	env->ReleaseStringChars(output_path, op);
+	env->ReleaseStringUTFChars(output_hash, oh);
+
+#else
+
     const codeunit* sp = (const codeunit*) env->GetStringUTFChars(spend_path, nullptr);
     const char* sh = (const char*) env->GetStringUTFChars(spend_hash, nullptr);
     const codeunit* op = (const codeunit*)  env->GetStringUTFChars(output_path, nullptr);
     const char* oh = (const char*) env->GetStringUTFChars(output_hash, nullptr);
     if (sp == NULL || sh == NULL || op == NULL || oh == NULL)
     {
-      return;
+        env->ThrowNew(env->FindClass("java/lang/NullPointerException"), "NULL string passed to librustzcashInitZksnarkParams");
+        return;
     }
-    librustzcash_init_zksnark_params(sp, (size_t) env->GetStringLength(spend_path), sh, op,
-    (size_t) env->GetStringLength(output_path), oh);
+    librustzcash_init_zksnark_params(sp, (size_t) env->GetStringUTFLength(spend_path), sh, op,
+    (size_t) env->GetStringUTFLength(output_path), oh);
     env->ReleaseStringUTFChars(spend_path, (const char*)sp);
     env->ReleaseStringUTFChars(spend_hash, sh);
     env->ReleaseStringUTFChars(output_path, (const char* )op);
     env->ReleaseStringUTFChars(output_hash, oh);
+#endif
 }
 
 /*
