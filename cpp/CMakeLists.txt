@@ -63,8 +63,7 @@ add_custom_command(
 set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES
 		${CMAKE_CURRENT_SOURCE_DIR}/../rust/librustzcash/target
 		)
-
-IF ($<CONFIG:Release> OR $<CONFIG:MinSizeRel>)
+IF (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL  "MinSizeRel")
 ExternalProject_Add(
 		librustzcash
 		DOWNLOAD_COMMAND ""
@@ -95,7 +94,7 @@ ExternalProject_Add(libsodium
 		URL https://github.com/ndv/libsodium/archive/refs/tags/1.0.21-snapshot.tar.gz
 		BUILD_IN_SOURCE 1
 		CONFIGURE_COMMAND ""
-		BUILD_COMMAND cd builds\\msvc\\vs2022\\libsodium && ${MSBUILD} -target:Build /p:Configuration=$<$<CONFIG:Release>:ReleaseLIB>$<$<CONFIG:Debug>:DebugLIB> /p:Platform=x64 
+		BUILD_COMMAND cd builds\\msvc\\vs2022\\libsodium && ${MSBUILD} -target:Build /p:Configuration=$<$<CMAKE_BUILD_TYPE:Release>:ReleaseLIB>$<$<CMAKE_BUILD_TYPE:Debug>:DebugLIB> /p:Platform=x64 
 		INSTALL_COMMAND ""
 		)
 ExternalProject_Get_Property(libsodium SOURCE_DIR)
@@ -108,11 +107,16 @@ set(RUSTZCASH_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/../rust/librustzcash/target
 
 # libsodium
 set (nacl_ver 1.0.15)
+
+IF (CMAKE_BUILD_TYPE STREQUAL Debug)
+  set (NACL_FLAGS --enable-debug)
+ENDIF()
+
 ExternalProject_Add(libsodium
 		URL https://github.com/jedisct1/libsodium/releases/download/${nacl_ver}/libsodium-${nacl_ver}.tar.gz
 		BUILD_IN_SOURCE 1
 		CONFIGURE_COMMAND <SOURCE_DIR>/autogen.sh
-		BUILD_COMMAND <SOURCE_DIR>/configure --disable-pie
+		BUILD_COMMAND <SOURCE_DIR>/configure --disable-pie ${NACL_FLAGS}
 		INSTALL_COMMAND make -j4
 		)
 ExternalProject_Get_Property(libsodium INSTALL_DIR)
